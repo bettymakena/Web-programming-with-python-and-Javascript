@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Dams for Inspection</title>
+
+  <!-- Calcite Components -->
+  <script type="module" src="https://js.arcgis.com/calcite-components/3.0.3/calcite.esm.js"></script>
+
+  <!-- ArcGIS Maps SDK -->
+  <link rel="stylesheet" href="https://js.arcgis.com/4.32/esri/themes/light/main.css" />
+  <script src="https://js.arcgis.com/4.32/"></script>
+
+  <style>
+    html, body, #viewDiv {
+      padding: 0;
+      margin: 0;
+      height: 100%;
+      width: 100%;
+    }
+  </style>
+</head>
+
+<!-- Arcade Expression for Pie Chart -->
+<script type="text/arcgis-arcade" id="dams-list">
+  var dams = Intersects($feature, FeatureSetByName($map, "Dams", ["Hazard"], false));
+  var stats = GroupBy(dams, ["Hazard"], [{ name: "count", expression: "1", statistic: "count" }]);
+
+  for (var item in stats){
+    var numdams = item.total;
+    var hazardType = item["Hazard"];
+    attributes[hazardType] = numdams;
+    Push(fieldInfos, { fieldName: hazardType});
+
+  }
+return({
+    type: "fields",
+    fieldInfos: fieldInfos,
+    attributes: attributes
+  });
+
+  
+</script>
+
+<script type="text/arcgis-arcade" id="dams-chart">
+  \\countinue from charts
+  var attributes = {};
+  var fieldInfos = [];
+
+  var dams = Intersects($feature, FeatureSetByName($map, "Dams", ["Hazard"], false));
+  
+
+ //query the count of dam grouped by hazard type
+ var stats = GroupBy(dams, ["Hazard"],
+ [
+    { name: "count", expression: "1", statistic: "count" }
+  ]);
+  
+for (var items in stats) {
+    var numdams = items.total;
+    var hazardType = items["Hazard"];
+    attributes[hazardType] = numdams;
+    Push(fieldInfos, { fieldName: hazardType });
+  }
+
+return{
+  type: "media",
+  attributes: attributes,
+  title: "Dams summary by Hazard Potential",
+  mediaInfos: [{
+    type: "pie-chart",
+    caption: "Dams by Hazard Potential",
+    value: {
+      fields: Object.keys(attributes),
+      normalizer: 1
+    },
+    legend: {
+      title: "Hazard Potential"
+    }
+  }]
+}
+
+
+
+</script>
+
+
+
+<body>
+  <div id="viewDiv"></div>
+
+  <script>
+    require([
+      "esri/Map",
+      "esri/views/MapView",
+      "esri/layers/FeatureLayer",
+      "esri/widgets/BasemapToggle",
+      "esri/widgets/Compass",
+      "esri/widgets/Legend",
+      "esri/widgets/Search"
+    ], function (
+      Map, MapView, FeatureLayer, BasemapToggle, Compass, Legend, Search
+    ) {
+
+      const map = new Map({
+        basemap: "topo-vector"
+      });
+
+      const view = new MapView({
+        container: "viewDiv",
+        map: map,
+        zoom: 6,
+        center: [-99.9018, 41.4925] // Nebraska
+      });
+
+      const dams = new FeatureLayer({
+        url: "https://gis.ne.gov/Enterprise/rest/services/Dams/FeatureServer/0",
+        title: "Dams Nebraska",
+        outFields: ["*"],
+        renderer: {
+          type: "simple",
+          symbol: {
+            type: "simple-marker",
+            color: "blue",
+            size: 5
+          }
+        }
+      });
+
+    
+
+      const county = new FeatureLayer({
+        url: "https://gis.ne.gov/Enterprise/rest/services/County_Boundaries/FeatureServer/0",
+        title: "Nebraska Counties",
+        outFields: ["*"],
+        renderer: {
+          type: "simple",
+          symbol: {
+            type: "simple-fill",
+            color: [0, 0, 0, 0],
+            outline: {
+              color: "black",
+              width: 1.5
+            }
+          }
+        },
+        popupTemplate: {
+          title: "{NAME} County",
+          content: [{
+            type: "expression",
+            expressionInfo: {
+              title: "Dams by Hazard Potential",
+              expression: document.getElementById("dams-list").textContent
+            }
+          },
+          {
+            type:expression,
+            expressionInfo: {
+              title: "Dams Chart",
+              expression: document.getElementById("dams-chart").textContent
+            }
+          }
+        
+        
+        ]
+        }
+      });
+
+      map.addMany([county, dams]);
+
+      view.ui.add(new Compass({ view }), "top-left");
+      view.ui.add(new Legend({ view }), "bottom-right");
+      view.ui.add(new Search({ view }), "top-left");
+    });
+  </script>
+</body>
+</html>
